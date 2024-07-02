@@ -8,15 +8,16 @@ import src.rich_console as console
 def unpack_to_image(asset_bytes: bytes, dest_path: str):
     env = UnityPy.load(asset_bytes)
     for obj in env.objects:
-        if obj.type.name in ["Texture2D", "Sprite"]:
-            try:
-                store_path = f"{Path(dest_path).parent}/image/{obj.type.name}"
-                Path(store_path).mkdir(parents=True, exist_ok=True)
-                data = obj.read()
-                img = data.image
-                img.save(f"{store_path}/{data.name}.png")
-            except:
-                console.error(f"Failed to convert '{data.name}' to image.")
+        if obj.type.name == "Texture2D":
+            data = obj.read()
+            if data.name.startswith("env") or data.name.startswith("img"):
+                try:
+                    store_path = f"{Path(dest_path).parent}/image/Texture2D"
+                    Path(store_path).mkdir(parents=True, exist_ok=True)
+                    img = data.image
+                    img.save(f"{store_path}/{data.name}.png")
+                except:
+                    console.error(f"Failed to convert '{data.name}' to image.")
 
 
 def resize_image(inputs: str, output: str, size: tuple = (0, 0)):
@@ -36,8 +37,9 @@ def image_scale(source: str, dest: str):
         update_database_dict = json.load(fp)
     for asset in update_database_dict["assetBundleList"]:
         name = asset["name"]
-        if name.startswith("img_card_full_1_") or \
-            (name.startswith("img_ui_hero_") and not name.startswith("img_ui_hero_event")):
+        if name.startswith("img_card_full_1_") or (
+            name.startswith("img_ui_hero_") and not name.startswith("img_ui_hero_event")
+        ):
             size = (2560, 1440)
         else:
             continue
