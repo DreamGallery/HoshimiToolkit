@@ -1,0 +1,4 @@
+grpcio>=1.70,<2
+protobuf>=5.29,<6
+Requests
+pycryptodome

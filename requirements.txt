@@ -1,0 +1,6 @@
+Pillow
+pycryptodome
+Requests
+rich
+UnityPy
+protobuf>=5.29,<6
