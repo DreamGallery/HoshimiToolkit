@@ -140,6 +140,23 @@ class AdventureCsvTests(unittest.TestCase):
                                     {"アイドル": "明星"}), 1)
         self.assertIn("name=明星", self.output.read_text(encoding="utf-8"))
 
+    def test_love_speaker_identity_survives_text_and_name_translation(self):
+        original = ('[message text=こんにちは name=鈴村優 thumbnial=icon_yuu '
+                    'clip=\\{\"time\":1\\}]\r\n'
+                    '[message text={user}さん name={user}]\r\n')
+        for filename in ('adv_love_2411_01_01.txt', 'adv_love_2411_01_01_short.txt'):
+            with self.subTest(filename=filename):
+                self.source = Path(self.temp.name) / filename
+                self.source.write_bytes(original.encode('utf-8'))
+                export_file(self.source, self.csv)
+                self.edit({'1:text:1': '你好'})
+                count = merge_file(self.source, self.csv, self.output,
+                                   {'鈴村優': '铃村优', '{user}さん': '{user}先生'})
+                expected = original.replace('text=こんにちは', 'text=你好').replace(
+                    'text={user}さん', 'text={user}先生')
+                self.assertEqual(count, 2)
+                self.assertEqual(self.output.read_bytes(), expected.encode('utf-8'))
+
     def test_name_glossary_fills_only_exact_standalone_text(self):
         self.source.write_text("[message text={user}さん name=アイドル]\n"
                                "[message text={user}さん、おはよう name=アイドル]\n",

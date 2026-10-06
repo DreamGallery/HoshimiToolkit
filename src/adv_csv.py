@@ -368,6 +368,11 @@ def merge_file(source: Path, translation: Path, output: Path,
     for item in items:
         if item.key != "name":
             continue
+        # Love stories resolve character identity from this field before UI
+        # rendering (portrait, nameplate color, etc.). Translate their visible
+        # names through the runtime dictionary, keeping the source key intact.
+        if source.name.startswith("adv_love_"):
+            continue
         value = (name_glossary or {}).get(item.source, "")
         if not value or value == item.source:
             continue

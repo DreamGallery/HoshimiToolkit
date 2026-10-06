@@ -61,7 +61,7 @@ python3 adv_csv.py merge --file adv_example.txt \
   --name-glossary /path/to/name-glossary.json
 ```
 
-`--name-glossary` 指向人名 JSON 字典，例如 Hoshimi_Teleprompter 提供的词典。CSV 的 `name` 列仅作上下文；人名在合并时统一替换。源 TXT、CSV 和输出目录可用 `--source-dir`、`--csv-dir`、`--output-dir` 指定；默认输出到 `cache/local-files/resource/`。
+`--name-glossary` 指向人名 JSON 字典，例如 Hoshimi_Teleprompter 提供的词典。CSV 的 `name` 列仅作上下文；人名在合并时统一替换。若恋（`adv_love_*`）的 `name=` 同时用于识别角色，需保留原文，由插件翻译显示姓名，避免丢失头像和姓名框配色。源 TXT、CSV 和输出目录可用 `--source-dir`、`--csv-dir`、`--output-dir` 指定；默认输出到 `cache/local-files/resource/`。
 
 可选的 `patch` 命令把已填写的正文和标题译文保存为精简 JSON，便于版本管理和以后重新导出 CSV：
 
@@ -86,4 +86,3 @@ python3 asset_patch.py --bundle cache/asset/image/IMAGE_RESOURCE_NAME \
 ```
 
 默认输出到 `cache/local-files/asset/`。
-
