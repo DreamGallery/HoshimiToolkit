@@ -51,6 +51,23 @@ class OfficialNoticeTests(unittest.TestCase):
         for response in ({}, {'idToken':'x','refreshToken':'y','expiresIn':'-1'}):
             with self.assertRaises(module.CollectorError): module.update_firebase_tokens({}, response)
 
+    def test_rpc_diagnostic_excludes_private_metadata_and_server_details(self):
+        class RpcError:
+            def code(self): return SimpleNamespace(name='FAILED_PRECONDITION')
+            def initial_metadata(self): return [('x-auth-token', 'private-token'), ('x-error-code', '1001')]
+            def trailing_metadata(self): return [('x-error-code', '1001'), ('x-error-code', 'private-value')]
+            def details(self): raise AssertionError('Server details must never be read')
+        self.assertEqual(module.rpc_error_summary(RpcError()),
+                         'Official RPC failed (status FAILED_PRECONDITION, application codes 1001)')
+
+    def test_rpc_diagnostic_handles_transport_failure_without_metadata(self):
+        class RpcError:
+            def code(self): return SimpleNamespace(name='UNAVAILABLE')
+            def initial_metadata(self): return None
+            def trailing_metadata(self): return None
+        self.assertEqual(module.rpc_error_summary(RpcError()),
+                         'Official RPC failed (status UNAVAILABLE, application codes none)')
+
     def make_collector(self):
         collector = module.OfficialCollector.__new__(module.OfficialCollector)
         collector.path = self.path

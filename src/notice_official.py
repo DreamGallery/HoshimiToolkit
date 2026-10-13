@@ -7,6 +7,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+import re
 import time
 
 from .master_fetch import atomic_json, firebase_api_key
@@ -15,6 +16,23 @@ from .notice_fetch import CATEGORIES, ROOT, select_notice_scope
 
 class CollectorError(RuntimeError):
     """Fixed, credential-free diagnostic suitable for CLI output."""
+
+
+def rpc_error_summary(error) -> str:
+    """Keep protocol codes, never server details, tokens or arbitrary metadata."""
+    allowed_statuses = {
+        "OK", "CANCELLED", "UNKNOWN", "INVALID_ARGUMENT", "DEADLINE_EXCEEDED",
+        "NOT_FOUND", "ALREADY_EXISTS", "PERMISSION_DENIED", "RESOURCE_EXHAUSTED",
+        "FAILED_PRECONDITION", "ABORTED", "OUT_OF_RANGE", "UNIMPLEMENTED",
+        "INTERNAL", "UNAVAILABLE", "DATA_LOSS", "UNAUTHENTICATED",
+    }
+    status = getattr(error.code(), "name", "UNKNOWN")
+    if status not in allowed_statuses:
+        status = "UNKNOWN"
+    codes = sorted({str(value) for key, value in
+                    [*(error.initial_metadata() or []), *(error.trailing_metadata() or [])]
+                    if key == "x-error-code" and re.fullmatch(r"[0-9]{1,5}", str(value))})
+    return "Official RPC failed (status " + status + ", application codes " + (",".join(codes) or "none") + ")"
 
 
 def validate_account_path(path: Path) -> Path:
@@ -254,5 +272,7 @@ def fetch_official_index(solis_dir: Path, app_version: str, account_path: Path,
         collector = OfficialCollector(solis_dir, app_version, account_path, create, initialize_day)
         try:
             return collector.fetch(max_pages, archive=archive)
+        except collector.grpc.RpcError as error:
+            raise CollectorError(rpc_error_summary(error)) from None
         finally:
             collector.channel.close()
