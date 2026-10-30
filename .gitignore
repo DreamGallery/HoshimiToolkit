@@ -75,5 +75,6 @@ coverage.xml
 /.analysis/
 /.codex/
 /.agents/
+/.agent-local/
 *.pfx
 *.p8

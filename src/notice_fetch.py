@@ -24,6 +24,7 @@ FIELDS = ("id", "title", "listTitle", "linkDetail", "linkType", "bannerAssetId",
 CATEGORIES = ((1, "notices", "noticeHasNext"),
               (2, "malfunctionNotices", "malfunctionNoticeHasNext"),
               (3, "prNotices", "prNoticeHasNext"))
+NOTICE_LIST_FIELDS = tuple(field for _, field, _ in CATEGORIES) + ("activityNotices",)
 
 
 def notice_path(value: str) -> str:
@@ -129,7 +130,7 @@ def input_paths(data: dict) -> list[str]:
         if not isinstance(data["pages"], dict):
             raise ValueError("pages must be an object")
         values.extend(data["pages"])
-    for _, field, _ in CATEGORIES:
+    for field in NOTICE_LIST_FIELDS:
         records = data.get(field, [])
         if not isinstance(records, list):
             raise ValueError("Notice lists must be arrays")
@@ -190,7 +191,7 @@ def collect_entry_titles(index: dict) -> dict:
         raise ValueError("Notice index must be an object")
     entries = []
     identities = set()
-    for _, category, _ in CATEGORIES:
+    for category in NOTICE_LIST_FIELDS:
         records = index.get(category, [])
         if not isinstance(records, list):
             raise ValueError("Notice category must be an array")
@@ -320,6 +321,7 @@ def main(argv=None):
     official.add_argument("--initialize-day", action="store_true", help="Allow dedicated collector Home.Login on DateChanged; may grant its automatic login rewards")
     official.add_argument("--max-pages", type=int, default=1000)
     official.add_argument("--archive", action="store_true", help="Explicitly include all FetchList history, not only the current window")
+    official.add_argument("--include-activities", action="store_true", help="Merge current activity noticeInfo through read-only Home/Top endpoints")
     official.add_argument("--output", type=Path)
     archive = commands.add_parser("archive-pages", help="Download official notice history with bounded workers and per-page resume cache")
     archive.add_argument("--input", type=Path, required=True)
@@ -349,10 +351,15 @@ def main(argv=None):
         elif args.command == "official-index":
             from .notice_official import fetch_official_index
             result = fetch_official_index(args.solis_dir, args.app_version, args.account,
-                                          args.create_account, args.max_pages, args.initialize_day, archive=args.archive)
+                                          args.create_account, args.max_pages, args.initialize_day,
+                                          archive=args.archive, include_activities=args.include_activities)
             if args.output is None:
                 args.output = ROOT / ("cache/notice/archive-index.json" if args.archive else "cache/notice/official-index.json")
-            count = sum(len(result[field]) for _, field, _ in CATEGORIES)
+            count = sum(len(result.get(field, [])) for field in NOTICE_LIST_FIELDS)
+            for activity in result.get("_activities", {}).get("activities", []):
+                if activity["status"] != "ok":
+                    print("Activity notice discovery incomplete: " + activity["service"] +
+                          " (" + activity["status"] + ")", file=sys.stderr)
         else:
             if args.max_pages < 1:
                 raise ValueError("max-pages must be positive")

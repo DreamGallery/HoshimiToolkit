@@ -160,6 +160,29 @@ class OfficialNoticeTests(unittest.TestCase):
             with self.assertRaises(module.CollectorError): collector.fetch(100)
         self.assertEqual(calls, ['list','initialize','list'])
 
+    def test_activity_discovery_is_opt_in_and_stale_master_uses_existing_recovery(self):
+        collector = self.make_collector()
+        class RpcError(Exception):
+            def initial_metadata(self): return [('x-error-code', '1002')]
+            def trailing_metadata(self): return []
+        collector.grpc = SimpleNamespace(RpcError=RpcError)
+        collector.account['metadata'] = {'x-app-version': 'test-version', 'x-master-version': 'fixture'}
+        collector.stubs.NoticeStub = lambda _: SimpleNamespace(List='list', FetchList='fetch')
+        collector.call = lambda *a, **k: {'notices': [{'id': 'regular'}]}
+        activity = ([{'id': 'activity'}], {'schema_version': 1, 'activities': []})
+        with patch.dict(sys.modules, {
+            'google.protobuf.empty_pb2': SimpleNamespace(Empty=lambda: None),
+            'google.protobuf.json_format': SimpleNamespace(MessageToDict=lambda obj, **kw: obj),
+        }), patch('src.notice_activities.discover_activity_notices', side_effect=[RpcError(), activity]) as discover:
+            self.assertNotIn('activityNotices', collector.fetch(100))
+            discover.assert_not_called()
+            result = collector.fetch(100, include_activities=True)
+        self.assertEqual(result['notices'], [{'id': 'regular'}])
+        self.assertEqual(result['activityNotices'], activity[0])
+        self.assertEqual(result['_activities'], activity[1])
+        self.assertEqual(discover.call_count, 2)
+        self.assertEqual(self.operations, ['master_get'])
+
     def test_failed_signup_leaves_uncertain_marker_without_retry(self):
         collector = self.make_collector()
         def fail(*a): raise module.CollectorError('transport')

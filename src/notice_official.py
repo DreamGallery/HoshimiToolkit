@@ -224,7 +224,7 @@ class OfficialCollector:
         self.account["last_daily_initialization"] = datetime.now(timezone.utc).isoformat()
         self.save()
 
-    def fetch(self, max_pages: int, *, archive: bool = False) -> dict:
+    def fetch(self, max_pages: int, *, archive: bool = False, include_activities: bool = False) -> dict:
         from google.protobuf.empty_pb2 import Empty
         from google.protobuf.json_format import MessageToDict
         if max_pages < 1:
@@ -242,6 +242,9 @@ class OfficialCollector:
             try:
                 result = select_notice_scope(as_dict(stub.List, Empty()),
                     lambda category, offset: as_dict(stub.FetchList, self.api.NoticeFetchRequest(noticeCategoryType=category, offset=offset)), max_pages, archive=archive)
+                if include_activities:
+                    from .notice_activities import discover_activity_notices
+                    result["activityNotices"], result["_activities"] = discover_activity_notices(self)
                 result["_provenance"] = {"source": "https://api.game-idolypride.jp/api.Notice/List",
                     "fetched_at": datetime.now(timezone.utc).isoformat(),
                     "returned_per_category": {field: len(result[field]) for _, field, _ in CATEGORIES},
@@ -267,11 +270,12 @@ class OfficialCollector:
 
 
 def fetch_official_index(solis_dir: Path, app_version: str, account_path: Path,
-                         create: bool = False, max_pages: int = 1000, initialize_day: bool = False, *, archive: bool = False) -> dict:
+                         create: bool = False, max_pages: int = 1000, initialize_day: bool = False, *,
+                         archive: bool = False, include_activities: bool = False) -> dict:
     with account_lock(account_path):
         collector = OfficialCollector(solis_dir, app_version, account_path, create, initialize_day)
         try:
-            return collector.fetch(max_pages, archive=archive)
+            return collector.fetch(max_pages, archive=archive, include_activities=include_activities)
         except collector.grpc.RpcError as error:
             raise CollectorError(rpc_error_summary(error)) from None
         finally:

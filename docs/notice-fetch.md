@@ -23,16 +23,24 @@ python3 notice_fetch.py official-index \
 ```sh
 python3 notice_fetch.py official-index \
   --solis-dir /path/to/SolisClient --app-version <当前游戏版本> \
-  --initialize-day
+  --initialize-day --include-activities
 ```
 
 `--create-account` 只允许本地没有账户缓存时创建一个 Firebase 游客。默认账户文件为 `cache/notice/collector-account.json`，其中令牌仅当前用户可读（0600）；每次运行复用缓存，自动刷新到期 Firebase 凭据，游戏会话失效时最多重新认证一次。Firebase API key 从既有本地配置读取，不写进代码。不要把用户实际游戏账号凭据填入专用采集账户文件。
 
-必要链为 Firebase 游客/续期 → QSeed → System.Check → Auth.Login →（服务器要求时刷新 Firebase 声明并重新登录一次）→ Master.Get 取得当前版本 → Notice.List/FetchList。初次游客和跨日请求可能返回 `DateChanged(1003)`；只有显式传入 `--initialize-day` 才调用一次专用采集账号的 Home.Login，这可能授予该账号自动登录奖励，并设置它的基础音量/画质选项。不使用该选项时明确停止，不执行初始化。不会调用手动领奖、购买、玩法或公告已读接口。
+必要链为 Firebase 游客/续期 → QSeed → System.Check → Auth.Login →（服务器要求时刷新 Firebase 声明并重新登录一次）→ Master.Get 取得当前版本 → Notice.List/FetchList。初次游客和跨日请求可能返回 `DateChanged(1003)`；只有显式传入 `--initialize-day` 才调用一次专用采集账号的 Home.Login，这可能授予该账号自动登录奖励，并设置它的基础音量/画质选项。不使用该选项时明确停止，不执行初始化。不会调用手动领奖、购买、推进玩法或公告已读接口。
 
 默认索引保存到 `cache/notice/official-index.json`，只保留 `Notice.List` 返回的三分类首批，标记 `current_window`，并在 `_pagination.first_page_has_next` 保存各分类是否还有后续分页；它不是“全部未过期公告”。显式添加 `--archive` 才继续调用 `FetchList`，默认另存 `cache/notice/archive-index.json`。历史模式每分类最多 1000 个后续分页；达到限制时报错，绝不把截断结果写成全量。两个模式均只保留静态字段，过滤账号响应和关联令牌。只读网络暂时故障最多重试三次；创建账号及初始化不盲目重试。首次创建的结果不明时保留标记并停止，避免下一次误建第二个账号。
 
 协议没有结束时间或 expired 字段。`startTime` 是发布时间，`displayNotification` 等字段不能据此解释为公告是否过期。游戏“加载更多”仍能展示历史条目，不能按正文日期或进入首页窗口与否自动删除缓存。日常采集与部署默认采用当前窗口，历史归档单独保留并显式选择。
+
+## 活动公告
+
+`--include-activities` 通过 `Home.Enter(skipUpdate=true)` 取得当前活动，再读取已解锁活动的 `Top` 接口。支持巡演、幕后、马拉松、摄影比赛、竞赛、若恋、Dream、Mosaic、骰子、相册和 Duty；首页嵌入公告及直接指向官方网页的活动入口也会收录。活动编号由接口返回，不固定到某一期活动。
+
+只提取 `noticeInfo` 的静态字段，保存为索引中的 `activityNotices`；账号响应、库存、进度、短剧情对白和选项不会进入输出。`pages`、`archive-pages` 和 `entry-titles` 会处理这组入口，相同网页只下载一次，沿用已有正文翻译流程。
+
+专用采集账号需要满足相应活动的开放条件。未解锁、条件不满足或功能维护会记录在 `_activities.activities`，并将 `complete_for_supported_activities` 标为 `false`；工具不会代为解锁或推进活动。其它接口错误仍按原有恢复规则处理，无法恢复则停止。该结果表示当前支持且可访问的活动范围，不代表所有活动或全历史公告。发布流程启用此选项，并在活动缺失时输出警告。
 
 ## 正文与独立入口标题
 
